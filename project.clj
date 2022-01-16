@@ -6,5 +6,5 @@
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [quil "2.8.0"]
                  [org.apache.commons/commons-math3 "3.3"]
-                 [genartlib/genartlib "0.1.17"]
+                 [genartlib "0.1.22"]
                  [org.clojure/math.numeric-tower "0.0.4"]])
