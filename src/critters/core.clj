@@ -23,5 +23,13 @@
   (use :reload 'critters.dynamic)
   (.redraw critter-sketch))
 
+(defn pause []
+	 (swap! dynamic/pause-state (fn [_] true)))
+
+(defn unpause []
+  (swap! dynamic/pause-state (fn [_] false))
+  (println "playing...")
+  (.redraw critter-sketch))
+
 (defn get-applet []
   critter-sketch)

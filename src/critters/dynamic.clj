@@ -99,7 +99,12 @@
 (defn reset-state []
   (swap! reset-state? (fn [_] true)))
 
+(defonce pause-state (atom false))
+
 (defn update-state [state]
+	 (if @pause-state
+	 	 (q/no-loop)
+	 	 (q/start-loop))
   (if @reset-state?
     (do
       (swap! reset-state? (fn [_] false))
