@@ -41,7 +41,7 @@
   (let [length (gauss length-u length-v)
         leg-length-coef (gauss leg-length-coef-u leg-length-coef-v)
         speed (max 0.1 (gauss (+ speed-u (* 0.067 (- length-u length))) speed-v))
-        period (gauss (+ period-u (* 0.4 (- speed-u speed))) period-v)
+        period (gauss (+ period-u (* 0.6 (- speed-u speed))) period-v)
         num-legs (max 24 (gauss (+ num-legs-u (* 0.8 (- length length-u))) num-legs-v))
         foot-r (max 1.4 (gauss (+ foot-r-u (* 0.07 (- num-legs-u num-legs))
                                            (* 0.1 (- length length-u))) foot-r-v))
@@ -55,7 +55,7 @@
      :period period
      :wavelength wavelength
      :leg-length-coef leg-length-coef
-     :motion-amp (gauss (* leg-length-coef length 0.08) 0.4)
+     :motion-amp (gauss (* leg-length-coef length 0.06) 0.4)
      :speed speed
      :hue (rand 255)}))
 
@@ -150,12 +150,12 @@
         (q/ellipse foot-x (- foot-y) foot-d foot-d)))))
 
 (defn draw-state [state]
-  (q/background 60)
+  (q/background 160)
   (q/stroke 255)
   (doseq [c (:critters state)]
     (q/with-translation [(:cx c) (:cy c)]
       (q/with-rotation [(+ q/PI (apply angle (:line c)))]
-        (q/stroke (:hue c) 35 255)
+        (q/stroke (:hue c) 195 105)
         (critter c)))))
   
   
