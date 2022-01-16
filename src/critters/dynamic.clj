@@ -135,8 +135,8 @@
             torso-y (* w 0.5 (q/sin rad))
             foot-d (* 2 foot-r)
             motion-t (* (q/millis) (/ q/TWO-PI (* 1000 period)))
-            motion-coef (* motion-amp (q/sin (+ motion-t 
-                                                (Math/abs (- (/ rad wavelength) q/PI)))))
+            motion-coef (* motion-amp (q/sin (- (+ motion-t 
+                                                   (Math/abs (- (/ rad wavelength) q/PI))))))
             motion-dx 0 #_(* motion-coef (q/cos rad))
             motion-dy (* motion-coef (q/sin rad))
             length (+ leg-length-coef motion-coef)
