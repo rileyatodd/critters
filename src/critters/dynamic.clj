@@ -1,7 +1,7 @@
 (ns critters.dynamic
   (:require [quil.core :as q])
   (:require [genartlib.util :as u])
-  (:require [genartlib.random :refer :all])
+  (:require [genartlib.random :as r :refer :all])
   (:require [genartlib.algebra :refer :all])
   (:require [clojure.math.numeric-tower :refer :all]))
 
@@ -9,7 +9,7 @@
                            :color false
                            :all false}))
 
-(defn play-pause [k] 
+(defn play-pause [k]
   (swap! play-state #(update-in % [k] not)))
 
 (defn plot [f xs]
@@ -28,7 +28,7 @@
 (def speed-v "" 0.5)
 (def period-u "" 1.5)
 (def period-v "" 0.12)
-(def num-legs-u "" 40)
+(def num-legs-u "" 44)
 (def num-legs-v "" 3)
 (def foot-r-u "" 2.5)
 (def foot-r-v "" 0.03)
@@ -38,29 +38,29 @@
 (def wavelength-v "" 0.01)
 
 (defn random-critter []
-  (let [length (gauss length-u length-v)
-        leg-length-coef (gauss leg-length-coef-u leg-length-coef-v)
-        speed (max 0.1 (gauss (+ speed-u (* 0.067 (- length-u length))) speed-v))
-        period (gauss (+ period-u (* 0.6 (- speed-u speed))) period-v)
-        num-legs (max 24 (gauss (+ num-legs-u (* 0.8 (- length length-u))) num-legs-v))
-        foot-r (max 1.4 (gauss (+ foot-r-u (* 0.07 (- num-legs-u num-legs))
+  (let [length (r/gauss length-u length-v)
+        leg-length-coef (r/gauss leg-length-coef-u leg-length-coef-v)
+        speed (max 0.1 (r/gauss (+ speed-u (* 0.067 (- length-u length))) speed-v))
+        period (r/gauss (+ period-u (* 0.6 (- speed-u speed))) period-v)
+        num-legs (max 24 (r/gauss (+ num-legs-u (* 0.8 (- length length-u))) num-legs-v))
+        foot-r (max 1.4 (r/gauss (+ foot-r-u (* 0.07 (- num-legs-u num-legs))
                                            (* 0.1 (- length length-u))) foot-r-v))
-        wavelength (gauss (+ wavelength-u (* -0.004 (- num-legs num-legs-u))) wavelength-v)]
-    {:cx (q/random (u/w)) 
-     :cy (q/random (u/h)) 
-     :l length 
-     :w (* length (gauss width-coef-u width-coef-v)) 
+        wavelength (r/gauss (+ wavelength-u (* -0.004 (- num-legs num-legs-u))) wavelength-v)]
+    {:cx (q/random (u/w))
+     :cy (q/random (u/h))
+     :l length
+     :w (* length (r/gauss width-coef-u width-coef-v))
      :num-legs num-legs
      :foot-r foot-r
      :period period
      :wavelength wavelength
      :leg-length-coef leg-length-coef
-     :motion-amp (gauss (* leg-length-coef length 0.06) 0.4)
+     :motion-amp (r/gauss (* leg-length-coef length 0.06) 0.4)
      :speed speed
      :hue (rand 255)}))
 
 (defn random-point-on-side [i]
-  (cond 
+  (cond
     (= i 0) [0 (rand (u/h))]
     (= i 1) [(rand (u/w)) 0]
     (= i 2) [(u/w) (rand (u/h))]
@@ -70,8 +70,8 @@
   (mapcat #(random-point-on-side %) (take 2 (shuffle (range 4)))))
 
 (defn scale-line-about-midpoint [[x0 y0 x1 y1] scale]
-  (let [rise (- y1 y0) 
-        run (- x1 x0) 
+  (let [rise (- y1 y0)
+        run (- x1 x0)
         mid-x (+ x0 (/ run 2))
         mid-y (+ y0 (/ rise 2))
         new-half-rise (* scale 0.5 rise)
@@ -120,8 +120,8 @@
                       angle (apply angle (:line c))
                       dx (* speed (q/cos angle))
                       dy (* speed (q/sin angle))]
-                  (merge c {:cx (+ dx (:cx c)) 
-                            :cy (+ dy (:cy c))}))) 
+                  (merge c {:cx (+ dx (:cx c))
+                            :cy (+ dy (:cy c))})))
               cs))}))
 
 (defn critter [{:keys [l w num-legs period wavelength leg-length-coef motion-amp period foot-r]}]
@@ -135,9 +135,9 @@
             torso-y (* w 0.5 (q/sin rad))
             foot-d (* 2 foot-r)
             motion-t (* (q/millis) (/ q/TWO-PI (* 1000 period)))
-            motion-coef (* motion-amp (q/sin (- (+ motion-t 
+            motion-coef (* motion-amp (q/sin (- (+ motion-t
                                                    (Math/abs (- (/ rad wavelength) q/PI))))))
-            motion-dx 0 #_(* motion-coef (q/cos rad))
+            motion-dx 0 #_(* -1 motion-coef (q/cos rad)) ;non-zero motion-dx makes critters seem to be crawling rather than swimming
             motion-dy (* motion-coef (q/sin rad))
             length (+ leg-length-coef motion-coef)
             ankle-x (+ motion-dx (* leg-length-coef torso-x))
@@ -145,8 +145,8 @@
             foot-x (+ ankle-x (* (q/cos rad) foot-r))
             foot-y (+ ankle-y (* (q/sin rad) foot-r))]
         (q/line torso-x torso-y ankle-x ankle-y)
-        (q/ellipse foot-x foot-y foot-d foot-d)
         (q/line torso-x (- torso-y) ankle-x (- ankle-y))
+        (q/ellipse foot-x foot-y foot-d foot-d)
         (q/ellipse foot-x (- foot-y) foot-d foot-d)))))
 
 (defn draw-state [state]
@@ -157,5 +157,8 @@
       (q/with-rotation [(+ q/PI (apply angle (:line c)))]
         (q/stroke (:hue c) 195 105)
         (critter c)))))
-  
-  
+
+(comment
+  (reset-state)
+
+)

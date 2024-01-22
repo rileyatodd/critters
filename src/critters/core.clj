@@ -24,7 +24,7 @@
   (.redraw critter-sketch))
 
 (defn pause []
-	 (swap! dynamic/pause-state (fn [_] true)))
+	(swap! dynamic/pause-state (fn [_] true)))
 
 (defn unpause []
   (swap! dynamic/pause-state (fn [_] false))
@@ -33,3 +33,8 @@
 
 (defn get-applet []
   critter-sketch)
+
+(comment
+  (get-applet)
+  (pause)
+  (unpause))
