@@ -135,19 +135,27 @@
             torso-y (* w 0.5 (q/sin rad))
             foot-d (* 2 foot-r)
             motion-t (* (q/millis) (/ q/TWO-PI (* 1000 period)))
-            motion-coef (* motion-amp (q/sin (- (+ motion-t
-                                                   (Math/abs (- (/ rad wavelength) q/PI))))))
+            motion-coef (* motion-amp (q/sin (+ motion-t
+                                                (Math/abs (- (/ rad wavelength) q/PI)))))
+            sides-offset q/QUARTER-PI
+            motion-coef-off (* motion-amp (q/sin (+ motion-t
+                                                    (Math/abs (- (/ rad wavelength) q/PI))
+                                                    sides-offset)))
             motion-dx 0 #_(* -1 motion-coef (q/cos rad)) ;non-zero motion-dx makes critters seem to be crawling rather than swimming
             motion-dy (* motion-coef (q/sin rad))
+            motion-dy-off (* motion-coef-off (q/sin rad))
             length (+ leg-length-coef motion-coef)
+            length-off (+ leg-length-coef motion-coef-off)
             ankle-x (+ motion-dx (* leg-length-coef torso-x))
             ankle-y (+ motion-dy (* leg-length-coef torso-y))
+            ankle-y-off (+ motion-dy-off (* leg-length-coef torso-y))
             foot-x (+ ankle-x (* (q/cos rad) foot-r))
-            foot-y (+ ankle-y (* (q/sin rad) foot-r))]
+            foot-y (+ ankle-y (* (q/sin rad) foot-r))
+            foot-y-off (+ ankle-y-off (* (q/sin rad) foot-r))]
         (q/line torso-x torso-y ankle-x ankle-y)
-        (q/line torso-x (- torso-y) ankle-x (- ankle-y))
+        (q/line torso-x (- torso-y) ankle-x (- ankle-y-off))
         (q/ellipse foot-x foot-y foot-d foot-d)
-        (q/ellipse foot-x (- foot-y) foot-d foot-d)))))
+        (q/ellipse foot-x (- foot-y-off) foot-d foot-d)))))
 
 (defn draw-state [state]
   (q/background 160)
