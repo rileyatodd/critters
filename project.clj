@@ -8,7 +8,7 @@
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/clojurescript "1.11.132"]
                  [quil "4.3.1323"]
-                 [cljsjs/p5 "1.7.0-0"]
+
                  [org.apache.commons/commons-math3 "3.3"]
                  [genartlib "0.1.22"]
                  [org.clojure/math.numeric-tower "0.0.4"]]
