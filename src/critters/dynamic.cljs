@@ -1,7 +1,8 @@
 (ns critters.dynamic
   (:require-macros [quil.core :as q])
   (:require [quil.core :as q]
-            [critters.util :as u]))
+            [critters.util :as u]
+            [cljs.pprint :refer [pprint]]))
 
 (defonce play-state (atom {:physics false
                            :color false
@@ -53,37 +54,98 @@
      :period period
      :wavelength wavelength
      :leg-length-coef leg-length-coef
+     :max-r (* 1.2 length leg-length-coef)
      :motion-amp (u/gauss (* leg-length-coef length 0.06) 0.4)
      :speed speed
      :hue (rand 255)}))
 
-(defn random-point-on-side [i]
+(defn random-point-on-rect-side [i min-x max-x min-y max-y]
+  ;; Don't let the point be too close to a corn
   (cond
-    (= i 0) [0 (rand (u/h))]
-    (= i 1) [(rand (u/w)) 0]
-    (= i 2) [(u/w) (rand (u/h))]
-    (= i 3) [(rand (u/w)) (u/h)]))
+    (= i 0) [min-x (u/rand-between min-y max-y)]
+    (= i 1) [(u/rand-between min-x max-x) min-y]
+    (= i 2) [max-x (u/rand-between min-y max-y)]
+    (= i 3) [(u/rand-between min-x max-x) max-y]))
 
 (defn random-line-thu-sketch []
-  (mapcat #(random-point-on-side %) (take 2 (shuffle (range 4)))))
+  (let [max-x (* .85 (u/w))
+        max-y (* .85 (u/h))
+        min-x (* .15 (u/w))
+        min-y (* .15 (u/h))]
+    (mapcat #(random-point-on-rect-side % min-x max-x min-y max-y)
+            (take 2 (shuffle (range 4))))))
+
+(defn flip-line [[x0 y0 x1 y1]]
+  [x1 y1 x0 y0])
+
+(defn extend-line-to-boundary [min-x min-y max-x max-y [x0 y0 x1 y1]]
+  (let [dy (- y1 y0)
+        dx (- x1 x0)
+        ybound (if (neg? dy) min-y max-y)
+        xbound (if (neg? dx) min-x max-x)
+        xdist (- xbound x1)
+        ydist (- ybound y1)]
+    (if (< (/ xdist dx)
+           (/ ydist dy))
+      [x0 y0 xbound (+ y1 (* xdist (/ dy dx)))]
+      [x0 y0 (+ x1 (* ydist (/ dx dy))) ybound])))
+
+(defn extend-line-to-both-boundaries [min-x min-y max-x max-y line]
+  (->> line
+       flip-line
+       (extend-line-to-boundary min-x min-y max-x max-y)
+       flip-line
+       (extend-line-to-boundary min-x min-y max-x max-y)))
 
 (defn scale-line-about-midpoint [[x0 y0 x1 y1] scale]
   (let [rise (- y1 y0)
         run (- x1 x0)
-        mid-x (+ x0 (/ run 2))
-        mid-y (+ y0 (/ rise 2))
-        new-half-rise (* scale 0.5 rise)
-        new-half-run (* scale 0.5 run)]
-    [(- mid-x new-half-run) (- mid-y new-half-rise)
-     (+ mid-x new-half-run) (+ mid-y new-half-rise)]))
+        factor (/ (- scale 1) 2)
+        extra-rise (* factor rise)
+        extra-run (* factor run)]
+    [(- x0 extra-run) (- y0 extra-rise)
+     (+ x1 extra-run) (+ y1 extra-rise)]))
 
 (defn random-critter-on-line []
-  (let [line (scale-line-about-midpoint (random-line-thu-sketch) 2)]
-    (merge (random-critter) {:cx (nth line 0) :cy (nth line 1) :line line})))
+  (let [small-line (random-line-thu-sketch)
+        bigger-line (scale-line-about-midpoint small-line 2)
+        critter (random-critter)
+        max-r (:max-r critter)
+        line (extend-line-to-both-boundaries (- max-r) (- max-r) (+ max-r (u/w)) (+ max-r (u/h)) small-line)
+        speed (:speed critter)
+        angle (apply u/angle line)
+        heading [(q/cos angle) (q/sin angle)]]
+    (merge critter
+           {:cx (nth line 0)
+            :cy (nth line 1)
+            :line line
+            :angle angle
+            :heading heading
+            :small-line small-line
+            :velocity (into [] (map #(* speed %) heading))})))
+
+(defn critter-on-screen? [critter]
+  (let [screen-w (u/w)
+        screen-h (u/h)
+        max-r (:max-r critter)
+        min-x (- max-r)
+        max-x (+ screen-w max-r)
+        min-y (- max-r)
+        max-y (+ screen-h max-r)]
+    #_(pprint [critter [min-x max-x min-y max-y]])
+    (and (u/between? (:cx critter) min-x max-x)
+         (u/between? (:cy critter) min-y max-y))))
+
+(defn critter-on-line? [critter]
+  (let [[x0 y0 x1 y1] (:line critter)]
+    (and (u/between? (:cx critter) x0 x1)
+         (u/between? (:cy critter) y0 y1))))
 
 (defn initial-state []
   {:critters (map (fn [_] (random-critter-on-line))
-                  (range 10))})
+                  (range 10))
+   :time-coef 1
+   :brightness 128})
 
 (defn setup []
   (q/frame-rate 30)
@@ -99,6 +161,30 @@
 
 (defonce pause-state (atom false))
 
+(defn state-step [state]
+  (let [millis (q/millis)]
+    (merge state
+           {:critters
+            (as-> (:critters state) cs
+              (filter (fn [c]
+                        (if (critter-on-line? c)
+                          (conj acc c)
+                          (do #_(pprint c)
+                              acc)))
+                      cs)
+              (if (< (rand) (* 0.025 (:time-coef state)))
+                (conj cs (random-critter-on-line))
+                cs)
+              (map (fn [c]
+                     (let [[dx dy] (map #(* (:time-coef state) %) (:velocity c))]
+                       (merge c {:cx (+ dx (:cx c))
+                                 :cy (+ dy (:cy c))})))
+                   cs))
+            :t (+ (:t state)
+                  (* (:time-coef state)
+                     (- millis (:last-millis state))))
+            :last-millis millis})))
+
 (defn update-state [state]
 	 (if @pause-state
 	 	 (q/no-loop)
@@ -107,23 +193,11 @@
     (do
       (swap! reset-state? (fn [_] false))
       (initial-state))
-    {:critters (as-> (:critters state) cs
-         (filter #(and (u/between? (:cx %) (nth (:line %) 0) (nth (:line %) 2))
-                       (u/between? (:cy %) (nth (:line %) 1) (nth (:line %) 3))) cs)
-         (if (< (rand) 0.025) (conj cs (random-critter-on-line)) cs)
-         (map (fn [c]
-                (let [speed (:speed c)
-                      [x0 y0 x1 y1] (:line c)
-                      slope (/ (- y1 y0) (- x1 x0))
-                      angle (apply u/angle (:line c))
-                      dx (* speed (q/cos angle))
-                      dy (* speed (q/sin angle))]
-                  (merge c {:cx (+ dx (:cx c))
-                            :cy (+ dy (:cy c))})))
-              cs))}))
+    (state-step state)))
 
-(defn critter [{:keys [l w num-legs period wavelength leg-length-coef motion-amp period foot-r]}]
-  (let [rad-per-leg (/ q/TWO-PI num-legs)]
+(defn critter [{:keys [l w num-legs period wavelength leg-length-coef motion-amp period foot-r]} time]
+  (let [rad-per-leg (/ q/TWO-PI num-legs)
+        ]
     (q/no-fill)
     (q/stroke-weight 2)
     (q/ellipse 0 0 l w)
@@ -132,9 +206,10 @@
       (let [torso-x (* l 0.5 (q/cos rad))
             torso-y (* w 0.5 (q/sin rad))
             foot-d (* 2 foot-r)
-            motion-t (* (q/millis) (/ q/TWO-PI (* 1000 period)))
+            motion-t (* time (/ q/TWO-PI (* 1000 period)))
             motion-coef (* motion-amp (q/sin (+ motion-t
                                                 (Math/abs (- (/ rad wavelength) q/PI)))))
+            ;; phase offset for legs on each side
             sides-offset q/QUARTER-PI
             motion-coef-off (* motion-amp (q/sin (+ motion-t
                                                     (Math/abs (- (/ rad wavelength) q/PI))
@@ -142,8 +217,6 @@
             motion-dx 0 #_(* -1 motion-coef (q/cos rad)) ;non-zero motion-dx makes critters seem to be crawling rather than swimming
             motion-dy (* motion-coef (q/sin rad))
             motion-dy-off (* motion-coef-off (q/sin rad))
-            length (+ leg-length-coef motion-coef)
-            length-off (+ leg-length-coef motion-coef-off)
             ankle-x (+ motion-dx (* leg-length-coef torso-x))
             ankle-y (+ motion-dy (* leg-length-coef torso-y))
             ankle-y-off (+ motion-dy-off (* leg-length-coef torso-y))
@@ -156,15 +229,16 @@
         (q/ellipse foot-x (- foot-y-off) foot-d foot-d)))))
 
 (defn draw-state [state _]
-  (q/background 160)
+  (q/background 160 12 240)
   (q/stroke 255)
   (doseq [c (:critters state)]
+    (q/stroke (:hue c) 215 (:brightness state))
     (q/with-translation [(:cx c) (:cy c)]
       (q/with-rotation [(+ q/PI (apply u/angle (:line c)))]
-        (q/stroke (:hue c) 195 105)
-        (critter c)))))
+        (critter c (:t state))))))
 
 (comment
   (reset-state)
+  (random-point-on-side 3)
   (swap! pause-state (fn [_] true))
 )

@@ -18,6 +18,10 @@
   (and (>= value (min end1 end2))
        (<= value (max end1 end2))))
 
+;; TODO make args not need to be ordered
+(defn rand-between [min max]
+  (+ min (rand (- max min))))
+
 (defn gauss
   "Samples a single value from a Gaussian distribution with the given mean
    and variance"
@@ -30,5 +34,12 @@
   [x1 y1 x2 y2]
   (let [a (q/atan2 (- y2 y1) (- x2 x1))]
     (if (neg? a)
-      (+ a (* PI 2.0))
+      (+ a (* q/PI 2.0))
       a)))
+
+(defn clamp [low high x]
+  (max low (min high x)))
+
+(comment
+  (angle l)
+)
